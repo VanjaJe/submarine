@@ -3,13 +3,20 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-
+#include <cmath>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #define CRES 30
+#define TRAIL_LENGTH 2500  
+#define CRES2 100  
+
+float points[CRES2 * 2];
+
+float trail[TRAIL_LENGTH * 4] = {0};
+int trailIndex = 0; 
 
 
 unsigned int compileShader(GLenum type, const char* source);
@@ -37,7 +44,7 @@ int main(void)
 
     GLFWwindow* window;
     unsigned int wWidth = 900;
-    unsigned int wHeight = 470;
+    unsigned int wHeight = 471;
     const char wTitle[] = "[Generic Title]";
     window = glfwCreateWindow(wWidth, wHeight, wTitle, NULL, NULL);
 
@@ -62,6 +69,7 @@ int main(void)
     unsigned int digitShader = createShader("digit.vert", "digit.frag");
     unsigned int warningShader = createShader("warning.vert", "warning.frag");
     unsigned int lightShader = createShader("light.vert", "light.frag");
+    unsigned int pointerShader = createShader("pointer.vert", "pointer.frag");
 
 
     float vertices[] =
@@ -249,41 +257,36 @@ int main(void)
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    float hand[4]; // Dva vrha: centar i kraj kazaljke
-    hand[0] = 0;   // Centar kazaljke (x)
-    hand[1] = 0;   // Centar kazaljke (y)
+    float pointer[4]; 
+    float angle = 45; 
+    pointer[0] = 0.0f; 
+    pointer[1] = 0.0f;
+    pointer[2] = r * cos((3.141592 / 180) * angle);
+    pointer[3] = r * sin((3.141592 / 180) * angle);
 
-    // Ugao rotacije (u stepenima)
-    float angle = 0;
+    unsigned int pointerVAO, pointerVBO;
+    glGenVertexArrays(1, &pointerVAO);
+    glGenBuffers(1, &pointerVBO);
 
-    // Pretvaranje ugla u radijane
-    float radian = angle * (3.141592 / 180);
-
-    // Koordinate kraja kazaljke
-    hand[2] = r * cos(radian); // x koordinata
-    hand[3] = r * sin(radian); // y koordinata
-    
-
-    unsigned int handVAO;
-    glGenVertexArrays(1, &handVAO);
-    unsigned int handVBO;
-    glGenBuffers(1, &handVBO);
-    glBindVertexArray(handVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, handVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, handVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(hand), hand, GL_DYNAMIC_DRAW);
+    glBindVertexArray(pointerVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, pointerVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pointer), pointer, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+
 
     float light[(CRES + 2) * 2];
     float r2 = 0.05;
 
-    light[0] = 0;
-    light[1] = 0;
-    for (int i = 0; i <= CRES; i++)
-    {
-        light[2 + 2 * i] = r2 * cos((3.141592 / 180) * (i * 360 / CRES));
-        light[2 + 2 * i + 1] = r2 * sin((3.141592 / 180) * (i * 360 / CRES));
+    float dx = 0.0f; 
+    float dy = 0.05f;
+
+    light[0] = dx; 
+    light[1] = dy; 
+
+    for (int i = 0; i <= CRES; i++) {
+        light[2 + 2 * i] = dx + r2 * cos((3.141592 / 180) * (i * 360 / CRES)); 
+        light[2 + 2 * i + 1] = dy + r2 * sin((3.141592 / 180) * (i * 360 / CRES)); 
     }
 
     unsigned int lightVAO;
@@ -295,10 +298,7 @@ int main(void)
     glBufferData(GL_ARRAY_BUFFER, sizeof(light), light, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    
 
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
 
     float progress1 = 0.0f;
     float progress2 = 0.0f;
@@ -309,6 +309,41 @@ int main(void)
     float lastTime = 0.0f;
     float deltaTime = 0.0f;
     float timeAccumulator = 0.0f;
+
+
+    unsigned int trailVAO, trailVBO;
+    glGenVertexArrays(1, &trailVAO);
+    glGenBuffers(1, &trailVBO);
+
+    glBindVertexArray(trailVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(trail), trail, GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    for (int i = 0; i < CRES; i++) {
+        float angle = ((float)rand() / RAND_MAX) * 2 * 3.14159;
+        float radius = sqrt(((float)rand() / RAND_MAX) * r * r);
+
+        points[i * 2] = radius * cos(angle);   
+        points[i * 2 + 1] = radius * sin(angle);
+    }
+
+
+    unsigned int pointsVAO, pointsVBO;
+    glGenVertexArrays(1, &pointsVAO);
+    glGenBuffers(1, &pointsVBO);
+
+    glBindVertexArray(pointsVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, pointsVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+   
 
     while (!glfwWindowShouldClose(window))
     {
@@ -325,7 +360,6 @@ int main(void)
 
             showNumber(std::round(progress2 * 1000 / 4), digits);
         }
-
 
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) 
         {
@@ -355,7 +389,6 @@ int main(void)
         //if (progress1 > 1.0f) progress1 = 0.0f;
         showNumber(std::round(progress1 * 100), digits2);
 
-        // Azuriranje verteksa za progres bar
         progressVertices[2 * 5 + 0] = -0.65 + 1.3f * progress1;
         progressVertices[3 * 5 + 0] = -0.65 + 1.3f * progress1;
 
@@ -402,8 +435,6 @@ int main(void)
             glUniform1f(timeLocation, timeValue);
             glBindTexture(GL_TEXTURE_2D, warningTexture);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-            
         };
 
 
@@ -411,7 +442,6 @@ int main(void)
         glUseProgram(digitShader);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
 
 
         // Prvi kvadrat (stotine)
@@ -432,11 +462,11 @@ int main(void)
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        // Prvi kvadrat (desetice)
+        // Prvi kvadrat 
         glBindTexture(GL_TEXTURE_2D, textures[digits2[1]]);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-        //Drugi kvadrat (jedinice)
+        //Drugi kvadrat 
         glBindTexture(GL_TEXTURE_2D, textures[digits2[0]]);
         glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
         glBindVertexArray(0);
@@ -453,21 +483,61 @@ int main(void)
 
 
         glViewport(wWidth / 2, 0, wWidth / 2, wHeight);
-       
+
+
         time += 0.001f;
         glUseProgram(sonarShader);
+
         glUniform1f(glGetUniformLocation(sonarShader, "time"), time);
         glBindVertexArray(VAO[1]);
         glDrawArrays(GL_TRIANGLE_FAN, 0, sizeof(circle) / (2 * sizeof(float)));
+        glBindVertexArray(0);
 
-        angle += 1.0f; 
-        if (angle >= 360.0f) angle = 0.0f;
 
-        updateHand(angle, hand, r); 
+        glUseProgram(pointerShader);
+        
+        glUniform1f(glGetUniformLocation(pointerShader, "time"), time);
 
-        glBindBuffer(GL_ARRAY_BUFFER, handVBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hand), hand);
 
+        float time = glfwGetTime();  
+        angle = fmod(time*4, 360.0f); 
+
+        pointer[0] = 0.0f; 
+        pointer[1] = 0.0f;
+        pointer[2] = r * cos((3.141592 / 180) * angle); 
+        pointer[3] = r * sin((3.141592 / 180) * angle);
+
+        trail[trailIndex * 4] = 0.0f;
+        trail[trailIndex * 4 + 1] = 0.0f;
+        trail[trailIndex * 4 + 2] = pointer[2];
+        trail[trailIndex * 4 + 3] = pointer[3];
+
+        trailIndex = (trailIndex + 1) %  TRAIL_LENGTH ;
+
+
+        glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, TRAIL_LENGTH * 4 * sizeof(float), trail);
+
+        glBindVertexArray(trailVAO);
+        
+        glLineWidth(2.0f);
+        glDrawArrays(GL_LINES, 0, trailIndex * 2);
+
+        glBindVertexArray(pointerVAO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, pointerVBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(pointer), pointer);
+
+        glLineWidth(4.0f);
+        glDrawArrays(GL_LINES, 0, 2);
+
+        bool showPoints = (int(time * 10) % 29 == 0); 
+
+        if (showPoints) {
+            glPointSize(7.0f);
+            glBindVertexArray(pointsVAO);
+            glDrawArrays(GL_POINTS, 0, CRES);
+        }
 
         glBindVertexArray(0);
         glUseProgram(0);
@@ -478,10 +548,18 @@ int main(void)
 
     glDeleteTextures(1, &warningShader);
     glDeleteBuffers(1, &dangerVBO);
+    glDeleteBuffers(1, &lightVBO);
+    glDeleteBuffers(1, &pointsVBO);
     glDeleteBuffers(2, digitsVBO);
     glDeleteVertexArrays(2, digitsVAO);
     glDeleteBuffers(2, VBO);
     glDeleteVertexArrays(2, VAO);
+    glDeleteVertexArrays(1, &lightVAO);
+    glDeleteVertexArrays(1, &pointsVAO);
+    glDeleteVertexArrays(1, &dangerVAO);
+    glDeleteProgram(pointerShader);
+    glDeleteProgram(lightShader);
+    glDeleteProgram(sonarShader);
     glDeleteProgram(unifiedShader);
 
     glfwTerminate();

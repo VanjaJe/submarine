@@ -54,5 +54,11 @@
     <None Include="light.frag">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="pointer.vert">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="pointer.frag">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

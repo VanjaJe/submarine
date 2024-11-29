@@ -139,6 +139,8 @@
     <None Include="light.frag" />
     <None Include="light.vert" />
     <None Include="packages.config" />
+    <None Include="pointer.frag" />
+    <None Include="pointer.vert" />
     <None Include="sonar.frag" />
     <None Include="sonar.vert" />
     <None Include="warning.frag" />
