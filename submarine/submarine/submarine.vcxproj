@@ -128,7 +128,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="proba.cpp" />
     <ClCompile Include="submarine.cpp" />
   </ItemGroup>
   <ItemGroup>

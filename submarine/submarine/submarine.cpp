@@ -10,7 +10,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #define CRES 30
-#define TRAIL_LENGTH 2500  
+#define TRAIL_LENGTH 2000  
 #define CRES2 100  
 
 float points[CRES2 * 2];
@@ -18,16 +18,20 @@ float points[CRES2 * 2];
 float trail[TRAIL_LENGTH * 4] = {0};
 int trailIndex = 0; 
 
+bool isSolarTurnedOn = true;
+
 
 unsigned int compileShader(GLenum type, const char* source);
 unsigned int createShader(const char* vsSource, const char* fsSource);
 static unsigned loadImageToTexture(const char* filePath);
 void showNumber(int number, int* digits);
 void loadTexture(unsigned* textures, int num, unsigned int shader);
-unsigned loadWarningTexture(unsigned digitShader);
+unsigned loadWarningTexture(unsigned digitShader, bool warning);
 unsigned loadNameTexture(unsigned digitShader);
 void updateHand(float angle, float* hand, float r);
-
+unsigned loadButtonTexture(unsigned digitShader);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+bool isMouseOverRectangle(float mouseX, float mouseY, float left, float right, float bottom, float top);
 
 int main(void)
 {
@@ -56,7 +60,6 @@ int main(void)
     }
 
     glfwMakeContextCurrent(window);
-
 
     if (glewInit() != GLEW_OK)
     {
@@ -87,11 +90,14 @@ int main(void)
 
     float dangerVertices[] =
     {
-        0.69, 0.15,  0.0, 0.0,  
-        0.99, 0.15,  1.0, 0.0, 
-        0.69, 0.45,  0.0, 1.0,  
-        0.99, 0.45,  1.0, 1.0, 
+        -0.75, -0.07,  0.0, 0.0,
+         0.55, -0.07,  1.0, 0.0,
+        -0.75,  0.2,  0.0, 1.0,
+         0.55,  0.20,  1.0, 1.0,
     };
+
+
+
 
     float digitsVertices1[] = {
         // Prvi kvadrat (cifra stotina)
@@ -114,13 +120,11 @@ int main(void)
     };
 
     float digitsVertices2[] = {
-        // Drugi kvadrat (cifra desetica)
         -0.20, 0.65,   0.0, 1.0, 
         -0.10, 0.65,   1.0, 1.0,
         -0.20, 0.55,   0.0, 0.0, 
         -0.10, 0.55,   1.0, 0.0,
 
-        // Treci kvadrat (cifra jedinica)
         -0.05, 0.65,   0.0, 1.0, 
         0.05,  0.65,   1.0, 1.0,
         -0.05, 0.55,   0.0, 0.0,  
@@ -148,6 +152,13 @@ int main(void)
         -0.07,  -0.85,  1.0,  1.0 
     };
 
+    float buttonVertices[] =
+    {
+        0.58, 0.70,  0.0, 0.0,
+        0.75, 0.70,  1.0, 0.0,
+        0.58, 0.85,  0.0, 1.0,
+        0.75, 0.85,  1.0, 1.0,
+    };
 
     unsigned textures[10];
 
@@ -197,7 +208,24 @@ int main(void)
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    unsigned warningTexture = loadWarningTexture(digitShader);
+    unsigned int buttonVAO;
+    glGenVertexArrays(1, &buttonVAO);
+    unsigned int buttonVBO;
+    glGenBuffers(1, &buttonVBO);
+
+    glBindVertexArray(buttonVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, buttonVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(buttonVertices), buttonVertices, GL_DYNAMIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    unsigned buttonTexture = loadButtonTexture(digitShader);
+
+    unsigned warningTexture = loadWarningTexture(digitShader, true);
+    unsigned notWarningTexture = loadWarningTexture(digitShader, false);
 
     unsigned int digitsVAO[2], digitsVBO[2];
     glGenVertexArrays(2, digitsVAO);
@@ -250,7 +278,6 @@ int main(void)
         circle[2 + 2 * i + 1] = r * sin((3.141592 / 180) * (i * 360 / CRES));
     }
 
-
     glBindVertexArray(VAO[1]);
     glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(circle), circle, GL_STATIC_DRAW);
@@ -276,10 +303,10 @@ int main(void)
 
 
     float light[(CRES + 2) * 2];
-    float r2 = 0.05;
+    float r2 = 0.06;
 
-    float dx = 0.0f; 
-    float dy = 0.05f;
+    float dx = -0.8f; 
+    float dy = 0.3f;
 
     light[0] = dx; 
     light[1] = dy; 
@@ -299,7 +326,6 @@ int main(void)
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-
     float progress1 = 0.0f;
     float progress2 = 0.0f;
 
@@ -309,7 +335,6 @@ int main(void)
     float lastTime = 0.0f;
     float deltaTime = 0.0f;
     float timeAccumulator = 0.0f;
-
 
     unsigned int trailVAO, trailVBO;
     glGenVertexArrays(1, &trailVAO);
@@ -340,210 +365,264 @@ int main(void)
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
    
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+
+    const double target_time = 1.0 / 60.0;
+    double last_frame_time = glfwGetTime();
 
     while (!glfwWindowShouldClose(window))
     {
+        double current_frame_time = glfwGetTime();
+        double delta_time = current_frame_time - last_frame_time;
 
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        {
-            glfwSetWindowShouldClose(window, GL_TRUE);
-        }
-
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        {
-            progress2 -= 0.00009f;
-            if (progress2 < 0.0f) progress2 = 0.0f;
-
-            showNumber(std::round(progress2 * 1000 / 4), digits);
-        }
-
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) 
-        {
-            progress2 += 0.00009f;
-            if (progress2 > 1.0f) progress2 = 1.0f;
-
-            showNumber(std::round(progress2 * 1000 / 4), digits);
-        }
-
-        glClearColor(0.4706, 0.4667, 0.4667, 1.0);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glUseProgram(unifiedShader);
-
-        glViewport(0, 0, wWidth / 2, wHeight);
-
-        glBindVertexArray(VAO[0]);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
+        if (delta_time >= target_time) {
 
 
-        progress1 += 0.00001f; 
-        if (progress1 > 1.0f) progress1 = 0.0f; 
+            if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+            {
+                glfwSetWindowShouldClose(window, GL_TRUE);
+            }
+
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            {
+                progress2 -= 0.0009f;
+                if (progress2 < 0.0f) progress2 = 0.0f;
+
+                showNumber(std::round(progress2 * 1000 / 4), digits);
+            }
+
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            {
+                progress2 += 0.0009f;
+                if (progress2 > 1.0f) progress2 = 1.0f;
+
+                showNumber(std::round(progress2 * 1000 / 4), digits);
+            }
+
+            glClearColor(0.4706, 0.4667, 0.4667, 1.0);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            glUseProgram(unifiedShader);
+
+            glViewport(0, 0, wWidth / 2, wHeight);
+
+            glBindVertexArray(VAO[0]);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
 
 
-        //progress1 += 0.001f;
-        //if (progress1 > 1.0f) progress1 = 0.0f;
-        showNumber(std::round(progress1 * 100), digits2);
-
-        progressVertices[2 * 5 + 0] = -0.65 + 1.3f * progress1;
-        progressVertices[3 * 5 + 0] = -0.65 + 1.3f * progress1;
-
-        progressVertices[6 * 5 + 0] = -0.65 + 1.3f * progress2;
-        progressVertices[7 * 5 + 0] = -0.65 + 1.3f * progress2;
-
-        glBindBuffer(GL_ARRAY_BUFFER, progressVBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(progressVertices), progressVertices);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+            progress1 += 0.0001f;
+            if (progress1 > 1.0f) progress1 = 0.0f;
 
 
-        glBindVertexArray(progressVAO);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); // Prvi progress bar
-        glDrawArrays(GL_TRIANGLE_STRIP, 4, 4); // Drugi progress bar
-        glBindVertexArray(0);
+            //progress1 += 0.001f;
+            //if (progress1 > 1.0f) progress1 = 0.0f;
+            showNumber(std::round(progress1 * 100), digits2);
+
+            progressVertices[2 * 5 + 0] = -0.65 + 1.3f * progress1;
+            progressVertices[3 * 5 + 0] = -0.65 + 1.3f * progress1;
+
+            progressVertices[6 * 5 + 0] = -0.65 + 1.3f * progress2;
+            progressVertices[7 * 5 + 0] = -0.65 + 1.3f * progress2;
+
+            glBindBuffer(GL_ARRAY_BUFFER, progressVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(progressVertices), progressVertices);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 
-        glBindVertexArray(lightVAO);
-        glUseProgram(lightShader);
-        unsigned int color = glGetUniformLocation(lightShader, "color");
+            glBindVertexArray(progressVAO);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); // Prvi progress bar
+            glDrawArrays(GL_TRIANGLE_STRIP, 4, 4); // Drugi progress bar
+            glBindVertexArray(0);
 
 
-        if (progress1 * 1000 > 750) {
-            glUniform4f(color, 1.0f, 0.0f, 0.0f, 1.0f);
-            glDrawArrays(GL_TRIANGLE_FAN, 0, sizeof(light) / (2 * sizeof(float)));
-        }
+            glBindVertexArray(lightVAO);
+            glUseProgram(lightShader);
+            unsigned int color = glGetUniformLocation(lightShader, "color");
+            glBindVertexArray(0);
 
-        if (progress1 * 1000 < 250) {
-            glUniform4f(color, 1.0f, 0.0f, 0.0f, 1.0f);
-            glDrawArrays(GL_TRIANGLE_FAN, 0, sizeof(light) / (2 * sizeof(float)));
+            //glUseProgram(lightShader);
+
+            //int circleCenterLocation = glGetUniformLocation(lightShader, "circleCenter");
+            //int circleRadiusLocation = glGetUniformLocation(lightShader, "circleRadius");
+            //int circleColorLocation = glGetUniformLocation(lightShader, "circleColor");
+            //int backgroundColorLocation = glGetUniformLocation(lightShader, "backgroundColor");
+
+            //glUniform2f(circleCenterLocation, 0.4f, 0.5f);
+            //glUniform1f(circleRadiusLocation, 0.8f);             
+            //glUniform4f(circleColorLocation, 1.0f, 0.0f, 0.0f, 1.0f); 
+            //glUniform4f(backgroundColorLocation, 0.4706, 0.4667, 0.4667, 1.0);
 
 
-            glBindVertexArray(dangerVAO);
+            if (progress1 * 1000 > 250) {
+                glUniform4f(color, 1.0f, 1.0f, 1.0f, 1.0f);
+                glDrawArrays(GL_TRIANGLE_FAN, 0, sizeof(light) / (2 * sizeof(float)));
+
+                glBindVertexArray(dangerVAO);
+
+                glUseProgram(warningShader);
+
+                GLuint timeLocation = glGetUniformLocation(warningShader, "time");
+
+                float timeValue = glfwGetTime();
+
+                glUniform1f(timeLocation, timeValue);
+                glBindTexture(GL_TEXTURE_2D, notWarningTexture);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                glBindVertexArray(0);
+
+            }
+
+            if (progress1 * 1000 < 250) {
+                glUniform4f(color, 1.0f, 0.0f, 0.0f, 1.0f);
+                glDrawArrays(GL_TRIANGLE_FAN, 0, sizeof(light) / (2 * sizeof(float)));
+
+                glBindVertexArray(dangerVAO);
+
+                float timeValue = glfwGetTime();
+
+                glUseProgram(warningShader);
+
+                GLuint timeLocation = glGetUniformLocation(warningShader, "time");
+
+                glUniform1f(timeLocation, timeValue);
+                glBindTexture(GL_TEXTURE_2D, warningTexture);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                glBindVertexArray(0);
+            };
+
+
+            glBindVertexArray(digitsVAO[0]);
             glUseProgram(digitShader);
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-            float timeValue = glfwGetTime();
 
-            glUseProgram(warningShader);
-
-            GLuint timeLocation = glGetUniformLocation(warningShader, "time");
-
-            glUniform1f(timeLocation, timeValue);
-            glBindTexture(GL_TEXTURE_2D, warningTexture);
+            // Prvi kvadrat (stotine)
+            glBindTexture(GL_TEXTURE_2D, textures[digits[2]]);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        };
+
+            // Drugi kvadrat (desetice)
+            glBindTexture(GL_TEXTURE_2D, textures[digits[1]]);
+            glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
+
+            //Treci kvadrat (jedinice)
+            glBindTexture(GL_TEXTURE_2D, textures[digits[0]]);
+            glDrawArrays(GL_TRIANGLE_STRIP, 8, 4);
 
 
-        glBindVertexArray(digitsVAO[0]);
-        glUseProgram(digitShader);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glBindVertexArray(digitsVAO[1]);
+            glUseProgram(digitShader);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            // Prvi kvadrat 
+            glBindTexture(GL_TEXTURE_2D, textures[digits2[1]]);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+            //Drugi kvadrat 
+            glBindTexture(GL_TEXTURE_2D, textures[digits2[0]]);
+            glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
+            glBindVertexArray(0);
 
 
-        // Prvi kvadrat (stotine)
-        glBindTexture(GL_TEXTURE_2D, textures[digits[2]]);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            glBindVertexArray(nameVAO);
+            glUseProgram(digitShader);
 
-        // Drugi kvadrat (desetice)
-        glBindTexture(GL_TEXTURE_2D, textures[digits[1]]);
-        glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
-
-         //Treci kvadrat (jedinice)
-        glBindTexture(GL_TEXTURE_2D, textures[digits[0]]);
-        glDrawArrays(GL_TRIANGLE_STRIP, 8, 4);
+            glBindTexture(GL_TEXTURE_2D, nameTexture);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 
-        glBindVertexArray(digitsVAO[1]);
-        glUseProgram(digitShader);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        // Prvi kvadrat 
-        glBindTexture(GL_TEXTURE_2D, textures[digits2[1]]);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-        //Drugi kvadrat 
-        glBindTexture(GL_TEXTURE_2D, textures[digits2[0]]);
-        glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
-        glBindVertexArray(0);
-
-        
-
-        glBindVertexArray(nameVAO);
-        glUseProgram(digitShader);
-        //glEnable(GL_BLEND);
-        //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        glBindTexture(GL_TEXTURE_2D, nameTexture);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            glViewport(wWidth / 2, 0, wWidth / 2, wHeight);
 
 
-        glViewport(wWidth / 2, 0, wWidth / 2, wHeight);
+            time += 0.0009f;
+            glUseProgram(sonarShader);
+
+            glUniform1f(glGetUniformLocation(sonarShader, "time"), time);
+            glBindVertexArray(VAO[1]);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, sizeof(circle) / (2 * sizeof(float)));
+            glBindVertexArray(0);
+
+            glBindVertexArray(buttonVAO);
+            glUseProgram(digitShader);
+
+            glBindTexture(GL_TEXTURE_2D, buttonTexture);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+            double mouseX, mouseY;
+            glfwGetCursorPos(window, &mouseX, &mouseY);
 
 
-        time += 0.001f;
-        glUseProgram(sonarShader);
+            if (isSolarTurnedOn) {
+                float time = glfwGetTime();
 
-        glUniform1f(glGetUniformLocation(sonarShader, "time"), time);
-        glBindVertexArray(VAO[1]);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, sizeof(circle) / (2 * sizeof(float)));
-        glBindVertexArray(0);
+                angle = fmod(time * 4, 360.0f);
 
+                pointer[0] = 0.0f;
+                pointer[1] = 0.0f;
+                pointer[2] = r * cos((3.141592 / 180) * angle);
+                pointer[3] = r * sin((3.141592 / 180) * angle);
 
-        glUseProgram(pointerShader);
-        
-        glUniform1f(glGetUniformLocation(pointerShader, "time"), time);
+                trail[trailIndex * 4] = 0.0f;
+                trail[trailIndex * 4 + 1] = 0.0f;
+                trail[trailIndex * 4 + 2] = pointer[2];
+                trail[trailIndex * 4 + 3] = pointer[3];
 
+                trailIndex = (trailIndex + 1) % TRAIL_LENGTH;
 
-        float time = glfwGetTime();  
-        angle = fmod(time*4, 360.0f); 
+                //glUseProgram(lightShader);
+                //unsigned int color = glGetUniformLocation(lightShader, "color");
+                //glUniform4f(color, 0.60f, 0.0f, 0.0f, 0.20f);
 
-        pointer[0] = 0.0f; 
-        pointer[1] = 0.0f;
-        pointer[2] = r * cos((3.141592 / 180) * angle); 
-        pointer[3] = r * sin((3.141592 / 180) * angle);
-
-        trail[trailIndex * 4] = 0.0f;
-        trail[trailIndex * 4 + 1] = 0.0f;
-        trail[trailIndex * 4 + 2] = pointer[2];
-        trail[trailIndex * 4 + 3] = pointer[3];
-
-        trailIndex = (trailIndex + 1) %  TRAIL_LENGTH ;
+                glUseProgram(pointerShader);
 
 
-        glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, TRAIL_LENGTH * 4 * sizeof(float), trail);
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        glBindVertexArray(trailVAO);
-        
-        glLineWidth(2.0f);
-        glDrawArrays(GL_LINES, 0, trailIndex * 2);
+                glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, TRAIL_LENGTH * 4 * sizeof(float), trail);
 
-        glBindVertexArray(pointerVAO);
+                glBindVertexArray(trailVAO);
 
-        glBindBuffer(GL_ARRAY_BUFFER, pointerVBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(pointer), pointer);
+                glLineWidth(2.0f);
+                glDrawArrays(GL_LINES, 0, trailIndex * 2);
 
-        glLineWidth(4.0f);
-        glDrawArrays(GL_LINES, 0, 2);
 
-        bool showPoints = (int(time * 10) % 29 == 0); 
+                glBindVertexArray(pointerVAO);
 
-        if (showPoints) {
-            glPointSize(7.0f);
-            glBindVertexArray(pointsVAO);
-            glDrawArrays(GL_POINTS, 0, CRES);
+                glBindBuffer(GL_ARRAY_BUFFER, pointerVBO);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(pointer), pointer);
+
+                glLineWidth(4.0f);
+                glDrawArrays(GL_LINES, 0, 2);
+
+                bool showPoints = (int(time * 10) % 28 == 0);
+
+                glUseProgram(pointerShader);
+
+                if (showPoints) {
+                    glPointSize(7.0f);
+                    glBindVertexArray(pointsVAO);
+                    glDrawArrays(GL_POINTS, 0, CRES);
+                }
+            }
+
+
+            glBindVertexArray(0);
+            glUseProgram(0);
+
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+
+            last_frame_time = current_frame_time;
         }
-
-        glBindVertexArray(0);
-        glUseProgram(0);
-
-        glfwSwapBuffers(window);
-        glfwPollEvents();
     }
 
     glDeleteTextures(1, &warningShader);
@@ -566,6 +645,42 @@ int main(void)
     return 0;
 }
 
+
+bool isMouseOverRectangle(float x, float y, float left, float right, float bottom, float top) {
+    return x >= left && x <= right && y >= bottom && y <= top;
+}
+
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    double mouseX, mouseY;
+    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+    {
+        glfwGetCursorPos(window, &mouseX, &mouseY);
+        float left = 0.58f;
+        float right = 0.75f;
+        float bottom = 0.70f;
+        float top = 0.85f;
+
+        int windowWidth, windowHeight;
+        glfwGetWindowSize(window, &windowWidth, &windowHeight);
+
+        double adjustedMouseX = mouseX - windowWidth / 2;
+        float normalizedX = (2.0f * adjustedMouseX / (windowWidth / 2)) - 1.0f;
+        float normalizedY = -1.0f * (2.0f * mouseY / windowHeight - 1.0f);
+
+        //float normalizedX = (2.0f * mouseX) / 900 - 1.0f;
+        //float normalizedY = 1.0f - (2.0f * mouseY) / 471; // Inverzija Y ose
+        std::cout << normalizedX << " : " << normalizedY << "   ";
+
+        if (isMouseOverRectangle(normalizedX, normalizedY, left, right, bottom, top)) {
+            std::cout << "Kliknuto na dugme!" << std::endl;
+            isSolarTurnedOn = !isSolarTurnedOn;
+            trail[TRAIL_LENGTH * 4] = { 0 };
+        }
+    }
+}
+
 void updateHand(float angle, float* hand, float r)
 {
     // Pretvaranje ugla u radijane
@@ -577,7 +692,6 @@ void updateHand(float angle, float* hand, float r)
 }
 
 void showNumber(int number, int* digits) {
-    //int digits[10];
     if (number == 0) {
         //std::cout << "0" << std::endl;
     }
@@ -592,8 +706,15 @@ void showNumber(int number, int* digits) {
 }
 
 
-unsigned loadWarningTexture(unsigned digitShader) {
-    std::string texturePath = "res/warning.png";
+unsigned loadWarningTexture(unsigned digitShader, bool warning) {
+    std::string texturePath;
+
+    if (warning) {
+        texturePath = "res/nedovoljan_nivo.png";
+    }
+    else {
+        texturePath = "res/dovoljan_nivo.png";
+    }
     unsigned warningTexture = loadImageToTexture(texturePath.c_str());
     glBindTexture(GL_TEXTURE_2D, warningTexture);
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -602,12 +723,24 @@ unsigned loadWarningTexture(unsigned digitShader) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
-    glUseProgram(digitShader);
-    unsigned uTexLoc = glGetUniformLocation(digitShader, "uTex");
-    glUniform1i(uTexLoc, 0);
     glUseProgram(0);
 
     return warningTexture;
+}
+
+unsigned loadButtonTexture(unsigned digitShader) {
+    std::string texturePath = "res/button.png";
+    unsigned buttonTexture = loadImageToTexture(texturePath.c_str());
+    glBindTexture(GL_TEXTURE_2D, buttonTexture);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glUseProgram(0);
+
+    return buttonTexture;
 }
 
 unsigned loadNameTexture(unsigned digitShader) {
