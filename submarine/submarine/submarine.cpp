@@ -466,21 +466,20 @@ int main(void)
             //std::cout << progress1 << "  ";
             showNumber(std::round(progress1 * 100), digits2);
 
-            progressVertices[2 * 5 + 0] = -0.65 + 1.3f * progress1;
-            progressVertices[3 * 5 + 0] = -0.65 + 1.3f * progress1;
+            progressVertices[10] = -0.65 + 1.3f * progress1;
+            progressVertices[15] = -0.65 + 1.3f * progress1;
 
-            progressVertices[6 * 5 + 0] = -0.65 + 1.3f * progress2;
-            progressVertices[7 * 5 + 0] = -0.65 + 1.3f * progress2;
-
-            glBindBuffer(GL_ARRAY_BUFFER, progressVBO);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(progressVertices), progressVertices);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-
+            progressVertices[30] = -0.65 + 1.3f * progress2;
+            progressVertices[35] = -0.65 + 1.3f * progress2;
 
             glBindVertexArray(progressVAO);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); // Prvi progress bar
             glDrawArrays(GL_TRIANGLE_STRIP, 4, 4); // Drugi progress bar
             glBindVertexArray(0);
+
+            glBindBuffer(GL_ARRAY_BUFFER, progressVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(progressVertices), progressVertices);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 
             glBindVertexArray(lightVAO);
@@ -500,11 +499,11 @@ int main(void)
             //glUniform4f(circleColorLocation, 1.0f, 0.0f, 0.0f, 1.0f); 
             //glUniform4f(backgroundColorLocation, 0.4706, 0.4667, 0.4667, 1.0);
 
+            glUniform4f(color, 0.0f, 0.0f, 0.0f, 1.0f);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, sizeof(light) / (2 * sizeof(float)));
+
 
             if (progress1 * 1000 > 750) {
-                glUniform4f(color, 0.0f, 0.0f, 0.0f, 1.0f);
-                glDrawArrays(GL_TRIANGLE_FAN, 0, sizeof(light) / (2 * sizeof(float)));
-
                 glBindVertexArray(dangerVAO);
 
                 glUseProgram(warningShader);
@@ -593,6 +592,7 @@ int main(void)
 
 
             glViewport(wWidth / 2, 0, wWidth / 2, wHeight);
+
             glBindVertexArray(backgroundVAO);
             glUseProgram(digitShader);
 
@@ -600,10 +600,11 @@ int main(void)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
             time += 0.009f;
+
+            glBindVertexArray(VAO[1]);
             glUseProgram(sonarShader);
 
             glUniform1f(glGetUniformLocation(sonarShader, "time"), time);
-            glBindVertexArray(VAO[1]);
             glDrawArrays(GL_TRIANGLE_FAN, 0, sizeof(circle) / (2 * sizeof(float)));
             glBindVertexArray(0);
 
@@ -613,14 +614,10 @@ int main(void)
             glBindTexture(GL_TEXTURE_2D, buttonTexture);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-            double mouseX, mouseY;
-            glfwGetCursorPos(window, &mouseX, &mouseY);
-
 
             if (isSolarTurnedOn) {
                 bool showPoints = (int(std::round(time) * 10) % 15 == 0);
 
-                glBindVertexArray(lightVAO);
                 glUseProgram(lightShader);
                 unsigned int color = glGetUniformLocation(lightShader, "color");
                 glUniform4f(color, 0.80f, 0.0f, 0.0f, 1.0f);
