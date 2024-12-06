@@ -213,7 +213,7 @@ int main(void)
 
     glBindVertexArray(dangerVAO);
     glBindBuffer(GL_ARRAY_BUFFER, dangerVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(dangerVertices), dangerVertices, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(dangerVertices), dangerVertices, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -227,7 +227,7 @@ int main(void)
 
     glBindVertexArray(buttonVAO);
     glBindBuffer(GL_ARRAY_BUFFER, buttonVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(buttonVertices), buttonVertices, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(buttonVertices), buttonVertices, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -243,7 +243,7 @@ int main(void)
 
     glBindVertexArray(backgroundVAO);
     glBindBuffer(GL_ARRAY_BUFFER, backgroundVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(backgroundVertices), backgroundVertices, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(backgroundVertices), backgroundVertices, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -285,7 +285,7 @@ int main(void)
 
     glBindVertexArray(nameVAO);
     glBindBuffer(GL_ARRAY_BUFFER, nameVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(nameVertices), nameVertices, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(nameVertices), nameVertices, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -326,7 +326,7 @@ int main(void)
 
     glBindVertexArray(pointerVAO);
     glBindBuffer(GL_ARRAY_BUFFER, pointerVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(pointer), pointer, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pointer), pointer, GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
@@ -390,7 +390,7 @@ int main(void)
 
     glBindVertexArray(pointsVAO);
     glBindBuffer(GL_ARRAY_BUFFER, pointsVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
@@ -481,7 +481,6 @@ int main(void)
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(progressVertices), progressVertices);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-
             glBindVertexArray(lightVAO);
             glUseProgram(lightShader);
             unsigned int color = glGetUniformLocation(lightShader, "color");
@@ -513,7 +512,7 @@ int main(void)
 
                 glUniform3f(color, 0.0f, 1.0f, 0.0f);
 
-                float timeValue = glfwGetTime();
+                float timeValue = 0.5236;
 
                 glUniform1f(timeLocation, timeValue);
                 glBindTexture(GL_TEXTURE_2D, notWarningTexture);
@@ -535,7 +534,7 @@ int main(void)
                 unsigned int color = glGetUniformLocation(warningShader, "color");
 
                 glUniform1f(timeLocation, timeValue);
-                glUniform3f(color, 2.0f, 0.0f, 0.0f);
+                glUniform3f(color, 1.0f, 0.0f, 0.0f);
 
                 glBindTexture(GL_TEXTURE_2D, warningTexture);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -684,13 +683,17 @@ int main(void)
 
     glDeleteTextures(1, &warningShader);
     glDeleteBuffers(1, &dangerVBO);
+    glDeleteBuffers(1, &backgroundVBO);
     glDeleteBuffers(1, &lightVBO);
+    glDeleteBuffers(1, &nameVBO);
     glDeleteBuffers(1, &pointsVBO);
     glDeleteBuffers(2, digitsVBO);
     glDeleteVertexArrays(2, digitsVAO);
     glDeleteBuffers(2, VBO);
     glDeleteVertexArrays(2, VAO);
     glDeleteVertexArrays(1, &lightVAO);
+    glDeleteVertexArrays(1, &backgroundVAO);
+    glDeleteVertexArrays(1, &nameVAO);
     glDeleteVertexArrays(1, &pointsVAO);
     glDeleteVertexArrays(1, &dangerVAO);
     glDeleteProgram(pointerShader);
